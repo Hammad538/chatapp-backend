@@ -2,9 +2,24 @@
 
 module Api
   class ChatRoomMessagesController < BaseController
+    include SessionConcern
     before_action :set_users, only: [:create]
+    before_action :check_session_token
+    before_action :session_expiry
+
+    def index
+      if params[:chat_room_id].present?
+        @chat_room_messages = ChatRoomMessage.where(chat_room_id: params[:chat_room_id]).order('created_at ASC')
+      end
+      if @chat_room_messages.present?
+        render json: @chat_room_messages
+      else
+        render json: 'You have no conversation with this user'
+      end
+    end
+
     def create
-      @message, @chat_room = ChatRoomService.new(user1: @user1, user2: @user2,
+      @message, @chat_room = ChatRoomService.new(sender: @user1, receiver: @user2,
                                                  message_params: message_params).search_chat_room
       if @chat_room.present? && @message.save
         ChatRoomChannel.broadcast_to(@chat_room.id, @message.body)
@@ -17,7 +32,7 @@ module Api
     private
 
     def message_params
-      params.require(:messages).permit(:body)
+      params.require(:chat_room_message).permit(:body)
     end
 
     def set_users
