@@ -2,8 +2,9 @@
 
 class User < ApplicationRecord
   has_one_time_password column_name: :otp_secret_key, length: 6
+  has_one_attached :image
   has_secure_password
-  validates :name, :phone_number, :image, presence: true
+  validates :name, :phone_number, presence: true
   validates :phone_number, numericality: true, length: { minimum: 11, maximum: 15 }
   validates :name, :phone_number, uniqueness: true
   has_many :chat_room_participants, dependent: :destroy

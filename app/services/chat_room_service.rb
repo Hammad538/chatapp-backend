@@ -1,33 +1,32 @@
 # frozen_string_literal: true
 
 class ChatRoomService < ApplicationService
-  attr_reader :sender, :receiver, :message_params
+  attr_reader :sender, :receiver
 
   def initialize(**args)
     @params = args
     @sender = @params[:sender]
     @receiver = @params[:receiver]
-    @message_params = @params[:message_params]
   end
 
-  def search_chat_room
+  def call
+    chat_room = create_chat_room
+    chat_room_particpants = create_chat_room_particpants(chat_room)
+    [] << chat_room
+  end
+
+  def create_chat_room
     phone_numbers = [sender.phone_number.last(3), receiver.phone_number.last(3)].sort!
-    chat_room = ChatRoom.find_by(name: phone_numbers.join('-'))
-    if chat_room.present?
-      chat_room_particpant = ChatRoomParticipant.find_by(chat_room_id: chat_room.id,
-                                                         user_id: sender.id || receiver.id)
-    end
-    chat_room, chat_room_particpant1 = create_chat_room(phone_numbers) unless chat_room_particpant.present?
-    message = ChatRoomMessage.new(message_params)
-    message.chat_room_id = chat_room.id
-    message.chat_room_participant_id = chat_room_particpant1&.id || chat_room_particpant&.id
-    [message, chat_room]
+    ChatRoom.create(name: phone_numbers.join('-'), user_id: sender.id)
   end
 
-  def create_chat_room(phone_numbers)
-    chat_room = ChatRoom.create(name: phone_numbers.join('-'), user_id: sender.id)
-    chat_room_particpant1 = ChatRoomParticipant.create(user_id: sender.id, chat_room_id: chat_room.id)
-    chat_room_particpant2 = ChatRoomParticipant.create(user_id: receiver.id, chat_room_id: chat_room.id)
-    [chat_room, chat_room_particpant1]
+  def create_chat_room_particpants(chat_room)
+    sender_particpant = ChatRoomParticipant.create(user_id: sender.id, chat_room_id: chat_room.id)
+    reciver_particpant = ChatRoomParticipant.create(user_id: receiver.id, chat_room_id: chat_room.id)
+  end
+
+  def find_chat_room
+    chat_room = ChatRoom.joins(:chat_room_participants).where(chat_room_participants: { user_id: [sender.id,
+                                                                                                  receiver.id] }).group(:id).having('count(DISTINCT chat_room_participants.user_id) = 2')
   end
 end

@@ -2,6 +2,8 @@
 
 module Api
   class SessionsController < BaseController
+    protect_from_forgery
+    skip_before_action :verify_authenticity_token
     include SessionConcern
     before_action :check_session_token, only: [:destroy]
     def create
@@ -11,11 +13,18 @@ module Api
       end
 
       user = User.find_by_phone_number(params[:phone_number])
+
       if user&.authenticate(params[:password])
         session[:token] = new_session_token
-        render json: { user: user, token: session[:token], message: 'Success' }
+        # NumberVerificationService.new(user).send
+        if user.errors.messages[:base].blank?
+          render json: { user: user, token: session[:token], message: 'Success' }
+        else
+          render json: { errors: user.errors.messages[:base] },
+                 status: 422 and return
+        end
       else
-        render json: 'Invalid Credentials'
+        render json: { errors: ['Invalid Credentials'] }, status: 422
       end
     end
 
